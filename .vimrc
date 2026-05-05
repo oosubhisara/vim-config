@@ -19,7 +19,6 @@ call plug#begin()
 Plug 'vim-airline/vim-airline'
 Plug 'scrooloose/nerdtree'
 Plug 'majutsushi/tagbar'
-Plug 'derekwyatt/vim-fswitch'
 Plug '42paris/42header'
 
 call plug#end()
@@ -69,6 +68,7 @@ let g:NERDTreeWinSize = 25
 let g:NERDTreeDirArrowExpandable = '+'
 let g:NERDTreeDirArrowCollapsible = '-'
 let NERDTreeIgnore=['\.pyc$', '\.bin$', '\.o$', '\.a$', '\.swp$', 'node_modules/[[dir]]']
+let g:NERDTreeQuitOnOpen = 1
 
 " Tagbar
 let g:tagbar_width = 30
@@ -112,6 +112,7 @@ nnoremap <leader>t2 :set tabstop=4<CR>
 nnoremap <leader>t3 :set tabstop=8<CR>
 
 " Code helper
+nnoremap <leader>g :call InsertHeaderGuard()<CR>
 nnoremap <leader>3 O/*<ESC>77a-<ESC>
 nnoremap <leader>4 o<ESC>77a-<ESC>a*/<ESC>
 inoremap <leader>` /*  */<ESC>hhi
@@ -128,13 +129,13 @@ vnoremap <C-c> "+y
 vnoremap <C-l> :g/^\s*$/d<CR>
 
 " NERDTree
-nnoremap <F2> :NERDTreeToggle<CR>
+nnoremap <F2> :NERDTreeToggle %:p:h<CR>
 
 " Tagbar
 nnoremap <F3> :TagbarToggle<CR>
 
-" FSwitch
-nnoremap <F4> :FSHere<CR>
+" Switch between source and header
+nnoremap <F4> :call SmartSwapCpp()<CR>
 
 " Header Guard
 nnoremap <F5> :call <SID>InsertHeaderGuard()<CR>
@@ -145,10 +146,14 @@ nnoremap <F7> :cprev<CR>
 nnoremap <F8> :cnext<CR>
 
 " ---- Auto Commands ---------------------------------------------------------
-autocmd BufNewFile *.{h,hpp} call <SID>InsertHeaderGuard()
-autocmd BufWrite *.h,*.c,*.sh call DeleteTrailingWS()
+" C header guard
+autocmd BufNewFile *.{h,hpp} call InsertHeaderGuard()
+" Delete trailing whitespaces
+autocmd BufWrite *.h,*.hpp,*.c,*.cpp,*.cppm,*.asm,*.sh,Makefile call DeleteTrailingWS()
+" Refresh NERDTree after saving
 autocmd BufWritePost * NERDTreeRefreshRoot
 autocmd bufenter * if (winnr("$") == 1 && exists("b:NERDTree") && b:NERDTree.isTabTree()) | q | endif
+
 "autocmd InsertEnter * set cursorline
 "autocmd InsertLeave * set nocursorline
 
@@ -159,11 +164,34 @@ function! DeleteTrailingWS()
   exe "normal `z"
 endfunc
 
-function! s:InsertHeaderGuard()
+function! InsertHeaderGuard()
   let guardName = substitute(toupper(expand("%:t")), "\\.", "_", "g")
   execute "normal! i#ifndef " . guardName
   execute "normal! o# define " . guardName . " "
   execute "normal! Go#endif"
   normal! kk
+endfunction
+
+function! SmartSwapCpp()
+    " ดึง Path เต็มของไฟล์ปัจจุบันแบบไม่เอานามสกุล
+    let l:target_base = expand('%:p:r')
+    let l:file_ext = expand('%:e')
+
+    if l:file_ext == 'cpp' || l:file_ext == 'cc'
+        " ตรวจสอบไฟล์เป้าหมายโดยใช้ Full Path
+        if filereadable(l:target_base . '.cppm')
+            execute 'edit ' . l:target_base . '.cppm'
+        elseif filereadable(l:target_base . '.hpp')
+            execute 'edit ' . l:target_base . '.hpp'
+        elseif filereadable(l:target_base . '.h')
+            execute 'edit ' . l:target_base . '.h'
+        endif
+    elseif l:file_ext == 'cppm' || l:file_ext == 'hpp' || l:file_ext == 'h'
+        if filereadable(l:target_base . '.cpp')
+            execute 'edit ' . l:target_base . '.cpp'
+        elseif filereadable(l:target_base . '.cc')
+            execute 'edit ' . l:target_base . '.cc'
+        endif
+    endif
 endfunction
 
